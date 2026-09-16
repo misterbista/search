@@ -1,6 +1,6 @@
 # Notes
 
-P0 first, then loading/empty/error and a11y. I skipped the detail page on purpose — search that actually works felt more important in four hours than a trailer page on top of a half-finished search.
+P0 first, then loading/empty/error. I skipped the detail page on purpose — search that actually works felt more important in four hours than a trailer page on top of a half-finished search.
 
 ## Rendering
 

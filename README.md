@@ -1,6 +1,6 @@
 # DEPT Full-Stack Coding Challenge — Movie Search
 
-# See [implementation notes](Note.md) for what I prioritized, skipped, and how rendering works.
+# See [implementation notes](note.md) for what I prioritized, skipped, and how rendering works.
 
 Great to see your interest in joining DEPT! This challenge is built on the same
 conventions we use in real DEPT projects — a .NET API and a Next.js frontend —

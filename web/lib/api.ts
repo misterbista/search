@@ -38,8 +38,24 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 /** TMDB-backed trending movies fetch. */
 export function getTrendingMovies(): Promise<Movie[]> {
-  return apiFetch<Movie[]>("/movies/trending", { cache: "no-store" });
+  return apiFetch<Movie[]>("/movies/trending", { next: { revalidate: 60 } });
 }
 
-// TODO(candidate): add a searchMovies(query, page) function here once the API exposes
-// GET /movies/search — same apiFetch pattern as getTrendingMovies above.
+export interface MovieSearchResult {
+  movies: Movie[];
+  page: number;
+  totalPages: number;
+  totalResults: number;
+}
+
+/** TMDB-backed paginated movie search. */
+export function searchMovies(
+  query: string,
+  page: number,
+): Promise<MovieSearchResult> {
+  const params = new URLSearchParams({ query, page: String(page) });
+
+  return apiFetch<MovieSearchResult>(`/movies/search?${params.toString()}`, {
+    cache: "no-store",
+  });
+}

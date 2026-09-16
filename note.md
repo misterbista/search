@@ -1,27 +1,38 @@
-# Implementation notes
+# Notes
 
-## Why server rendering
+P0 first, then loading/empty/error and a11y. I skipped the detail page on purpose — search that actually works felt more important in four hours than a trailer page on top of a half-finished search.
 
-The existing page and API helper already fetch data on the server. Keeping search there reuses that flow and avoids separate browser fetching and result state. This suits submit-based search with page links.
+## Rendering
 
-The server renders results; the client search bar handles input, navigation, and pending feedback. Shareable URLs and back/forward navigation come from URL state, not SSR itself.
+Home was already a server page talking to the .NET API, so I kept search on that path. The URL is the source of truth (`?query=` / `&page=`). Submit and pagination just change the URL; the server fetches and renders. That gives shareable links and back/forward for free, without a client cache of results.
 
-Each search requires a server round trip. Search and trending use separate async server components with Suspense, so each section can appear as it becomes ready. Trending is cached for 60 seconds; search is uncached.
+SearchBar is a client component because it needs local input, `useTransition` for pending UI, and it shouldn't clobber what you typed while a navigation is in flight. Results themselves are a server component behind Suspense, keyed on query + page so a new search doesn't sit on stale output.
 
-## Implementation
+Trending stays on the page even while you're searching. It's its own async component, so a slow search doesn't block the grid you already had. Trending is revalidated every 60s (same movies all week, no point hitting TMDB every request). Search is `no-store` — you want the page you asked for, not a cached one.
 
-- Preserves the existing controller → handler → service → client flow and mappers.
-- Returns `movies`, `page`, `totalPages`, and `totalResults`; validates queries and pages 1–500.
-- Keeps trending visible, resets search on clear, and redirects pages beyond the result count to page 1.
-- Each section owns its fetch, loading state, and failure message; the home page composes them.
+I considered a native GET form (no JS). Dropped it because clearing the box and the "Searching…" state are nicer with a small client island, and the results still come from the server.
 
-## Verification and scope
+## API
 
-API build, frontend lint, typecheck, and the existing movie-card test passed. API tests passed earlier. Current frontend tests do not cover search interactions.
+Same chain as trending: controller → handler factory → service → TMDB client → mapper. I didn't invent a second style.
 
-## Left out
+Response is `{ movies, page, totalPages, totalResults }`. Empty query and page outside 1–500 are 400s. TMDB's 500-page cap is the ceiling on both sides.
 
-- **Details and trailers:** require additional endpoints, a page, and video handling; prioritized search and pagination first.
-- **TV search:** adds a second content type and UI choices beyond the movie-only scope.
-- **Search caching:** deferred until repeated-query traffic justifies cache duration and freshness decisions. Trending has more predictable reuse.
-- **Debouncing:** search runs on submit, so typing does not send requests.
+## Frontend
+
+- Search is submit-based, not typeahead. Fewer requests, and it matches a search box that already looked like a form.
+- Empty input (including clearing the field) drops back to `/`.
+- If someone pastes `page=999` and TMDB only has 3 pages, we redirect to page 1 of that query rather than an empty grid.
+- Search and trending each own their fetch, skeleton/status, and error copy. The page just composes them. A failed search shouldn't take down trending, and the other way around.
+- Pagination is prev/next plus "Page x of y". Infinite scroll would fight shareable page URLs; numbered pages felt like overkill for this.
+
+## What I ran
+
+`dotnet test` in `api/`. In `web/`: lint, typecheck, existing MovieCard test. I didn't add frontend tests for the search bar — time went into the actual flow.
+
+## Skipped
+
+- **Movie detail / trailer (P2).** Extra endpoint, page, and YouTube embed. Would have been next if search + pagination weren't the thing being graded.
+- **TV search.** The app is movies-only on purpose; a second type is a product decision, not a free add-on.
+- **Caching search.** Trending is stable enough to cache. Search isn't, until we know which queries repeat.
+- **Debounce.** Nothing fires on keystroke, so there's nothing to debounce.
